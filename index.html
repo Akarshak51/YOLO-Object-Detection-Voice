@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>YOLO Object Detection & Voice</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/public/favicon.ico" type="image/x-icon">
+
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    canvas { border: 1px solid #ccc; }
+    #result { margin-top: 1em; }
+  </style>
+</head>
+<body>
+  <h1>YOLO Object Detection & Voice</h1>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+  <br/>
+  <button id="capture">Capture & Analyze</button>
+  <div id="result"></div>
+
+  <script>
+    let stream;
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const resultDiv = document.getElementById("result");
+    const captureBtn = document.getElementById("capture");
+
+    // Start camera
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+        video.srcObject = stream;
+        video.play();
+        resultDiv.innerText = "Camera ready. Click Capture & Analyze.";
+      } catch (err) {
+        resultDiv.innerHTML = `<span style="color:red;">Camera error: ${err.message}</span>`;
+        captureBtn.disabled = true;
+      }
+    }
+
+    // Voice narration
+    function speak(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "en-IN";
+      speechSynthesis.speak(utterance);
+    }
+
+    // Capture and analyze
+    async function captureAndAnalyze() {
+      if (!stream || video.readyState < 2) {
+        resultDiv.innerHTML = `<span style="color:red;">Camera not ready.</span>`;
+        return;
+      }
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imgData = canvas.toDataURL('image/jpeg');
+
+      resultDiv.innerText = "Analyzing...";
+
+      try {
+        const response = await fetch("http://localhost:8000/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: imgData })
+        });
+
+        if (!response.ok) throw new Error("Server error: " + response.statusText);
+        const res = await response.json();
+
+        if (res.error) {
+          resultDiv.innerHTML = `<span style="color:red;">Error: ${res.error}</span>`;
+          return;
+        }
+
+        const analysis = res.analysis || [];
+        if (analysis.length === 0) {
+          resultDiv.innerText = "No objects detected.";
+          return;
+        }
+
+        // Redraw image
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Draw bounding boxes and labels
+        ctx.strokeStyle = "lime";
+        ctx.lineWidth = 2;
+        ctx.font = "16px Arial";
+        ctx.fillStyle = "yellow";
+
+        let narration = [];
+
+        analysis.forEach(obj => {
+          const [x1, y1, x2, y2] = obj.bbox || [0, 0, 0, 0];
+          ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+          ctx.fillText(`${obj.object} (${obj.distance_m} m)`, x1, y1 - 5);
+          narration.push(`${obj.object} at ${obj.distance_m} meters`);
+        });
+
+        resultDiv.innerHTML = analysis.map(obj =>
+          `<div><b>${obj.object}</b> — ${obj.distance_m} m</div>`
+          
+        ).join("");
+
+        speak("Detected: " + narration.join(", "));
+
+      } catch (err) {
+        resultDiv.innerHTML = `<span style="color:red;">Failed to analyze: ${err.message}</span>`;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', startCamera);
+    captureBtn.addEventListener("click", captureAndAnalyze);
+    window.addEventListener('beforeunload', () => {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+    });
+  </script>
+</body>
+</html>
