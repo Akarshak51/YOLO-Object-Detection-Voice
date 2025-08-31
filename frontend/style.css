@@ -1,0 +1,35 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    color: #333;
+    padding: 2rem;
+    max-width: 600px;
+    margin: auto;
+    text-align: center;
+}
+h1 {
+    margin-bottom: 1.5rem;
+}
+video, canvas {
+    width: 100%;
+    max-width: 400px;
+    margin: 10px auto;
+    border-radius: 12px;
+    background: #222;
+}
+button {
+    padding: 0.5rem 1rem;
+    background-color: #0078d4;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    border-radius: 6px;
+}
+button:hover {
+    background-color: #005fa3;
+}
+#result {
+    margin-top: 2rem;
+    font-size: 1.1rem;
+}
